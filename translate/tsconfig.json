@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "noUncheckedSideEffectImports": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "types": ["node", "vitest"],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "src/index.ts",
+    "src/cli/translate-runner.ts",
+    "src/cli/**/*.ts",
+    "src/backend/engine/work-unit/work-unit-worker-entry.ts",
+    "src/backend/engine/planning/planning-worker-entry.ts"
+  ],
+  "exclude": ["dist", "node_modules"]
+}

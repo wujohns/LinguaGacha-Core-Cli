@@ -1,0 +1,45 @@
+{
+  "name": "linguagacha-translate",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standalone LinguaGacha translate CLI",
+  "type": "module",
+  "bin": {
+    "linguagacha-translate": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
+    "@google/genai": "^2.7.0",
+    "ansis": "^4.3.0",
+    "chardet": "^2.1.1",
+    "css-select": "^7.0.0",
+    "dom-serializer": "^3.1.1",
+    "domhandler": "^6.0.1",
+    "domutils": "^4.0.2",
+    "entities": "^8.0.0",
+    "exceljs": "^4.4.0",
+    "htmlparser2": "^12.0.0",
+    "iconv-lite": "^0.7.2",
+    "jsonrepair": "^3.14.0",
+    "js-tiktoken": "^1.0.21",
+    "jszip": "^3.10.1",
+    "openai": "^6.39.1",
+    "opencc-js": "^1.3.1",
+    "undici": "^8.3.0",
+    "wrap-ansi": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "tsup": "^8.5.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}

@@ -1,0 +1,33 @@
+import type { ApiJsonValue } from "../../api/api-types";
+import type { LogError } from "../../../shared/error";
+
+/** work unit 日志只允许可序列化摘要，避免 worker 线程回传 Error 引用 */
+export type WorkUnitLogEntry = {
+  level: "info" | "warning" | "error";
+  message: string;
+  error?: LogError;
+  context?: Record<string, ApiJsonValue>;
+};
+
+/** 翻译 work unit 是 Engine 发给 worker 的不可变执行载荷 */
+export type TranslationWorkUnit = {
+  unit_id: string;
+  run_id: string;
+  kind: "translation";
+  model: ApiJsonValue;
+  config_snapshot: ApiJsonValue;
+  quality_snapshot: ApiJsonValue;
+  payload: {
+    items: ApiJsonValue;
+    precedings: ApiJsonValue;
+  };
+  diagnostics: {
+    token_threshold: number;
+    split_count: number;
+    retry_count: number;
+    is_initial: boolean;
+  };
+};
+
+/** WorkUnit 是 worker execute_unit 唯一入口载荷 */
+export type WorkUnit = TranslationWorkUnit;

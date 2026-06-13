@@ -1,0 +1,6 @@
+*.log
+refs/
+translate/dist/
+translate/node_modules/
+translate/.linguagacha-translate-runtime/
+translate/.vitest/
