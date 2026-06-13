@@ -58,6 +58,7 @@ class FakeServices {
   public readonly created_projects: unknown[] = [];
   public readonly loaded_projects: unknown[] = [];
   public readonly exported_dirs: string[] = [];
+  public restore_failed_count = 0;
   public unloaded = false;
   public transient_overrides: unknown[] = [];
 
@@ -99,6 +100,11 @@ class FakeServices {
 
   public async commit_cli_resource_operations(): Promise<void> {
     return undefined;
+  }
+
+  public async restore_failed_translation_items_for_continue(): Promise<number> {
+    this.restore_failed_count += 1;
+    return 0;
   }
 
   public as_runtime_services(): TranslateRuntimeServices {
@@ -174,6 +180,7 @@ describe("run_translate_job", () => {
 
       expect(services.created_projects).toEqual([]);
       expect(services.loaded_projects).toEqual([{ path: path.resolve(command.projectPath) }]);
+      expect(services.restore_failed_count).toBe(mode === "continue" ? 1 : 0);
       expect(services.start_records).toHaveLength(1);
       expect(services.start_records[0]).toMatchObject({
         task_type: "translation",

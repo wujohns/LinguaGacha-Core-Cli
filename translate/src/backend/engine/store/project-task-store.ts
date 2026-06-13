@@ -96,6 +96,58 @@ export class ProjectTaskStore {
   }
 
   /**
+   * CLI continue 启动前把上一轮失败项恢复为干净待处理状态。
+   */
+  public async restore_failed_translation_items_for_continue(): Promise<MutableJsonRecord> {
+    const project_path = this.require_loaded_project_path();
+    const items = this.cache.items.readItems();
+    const failed_items = items.filter((item) => String(item["status"] ?? "") === "ERROR");
+    if (failed_items.length === 0) {
+      return { restored_count: 0 };
+    }
+    const restored_ids = failed_items
+      .map((item) => this.read_number(item["item_id"] ?? item["id"], 0))
+      .filter((item_id) => item_id > 0);
+    if (restored_ids.length === 0) {
+      return { restored_count: 0 };
+    }
+    const restored_id_set = new Set(restored_ids);
+    const next_items = items.map((item) => {
+      const item_id = this.read_number(item["item_id"] ?? item["id"], 0);
+      if (!restored_id_set.has(item_id)) {
+        return item;
+      }
+      return {
+        ...item,
+        dst: "",
+        name_dst: null,
+        status: "NONE",
+        retry_count: 0,
+      };
+    });
+    const extras = {
+      ...this.normalize_progress_snapshot(this.normalize_object(this.get_all_meta(project_path)["translation_extras"])),
+      ...this.build_translation_progress_from_items(next_items),
+    };
+    const ack = await this.write_store.apply_translation_item_patches({
+      projectPath: project_path,
+      items: restored_ids.map((item_id) => ({
+        item_id,
+        dst: "",
+        name_dst: null,
+        status: "NONE",
+        retry_count: 0,
+      })) as unknown as ApiJsonValue,
+      translationExtras: extras,
+    });
+    return {
+      restored_count: restored_ids.length,
+      restored_item_ids: restored_ids as unknown as ApiJsonValue,
+      section_revisions: ack.section_revisions,
+    };
+  }
+
+  /**
    * artifact 是项目任务事实唯一写入口的公开提交协议，调用方不再接触数据库 operation 形状
    */
   public async commit_artifacts(request: JsonRecord): Promise<MutableJsonRecord> {
@@ -157,6 +209,30 @@ export class ProjectTaskStore {
       meta: { translation_extras: extras as unknown as ApiJsonValue },
     });
     return { accepted: true };
+  }
+
+  private build_translation_progress_from_items(items: MutableJsonRecord[]): MutableJsonRecord {
+    let total_line = 0;
+    let processed_line = 0;
+    let error_line = 0;
+    for (const item of items) {
+      const status = String(item["status"] ?? "");
+      if (status === "NONE" || status === "PROCESSED" || status === "ERROR") {
+        total_line += 1;
+      }
+      if (status === "PROCESSED") {
+        processed_line += 1;
+      }
+      if (status === "ERROR") {
+        error_line += 1;
+      }
+    }
+    return {
+      total_line,
+      processed_line,
+      error_line,
+      line: processed_line + error_line,
+    };
   }
 
   /**

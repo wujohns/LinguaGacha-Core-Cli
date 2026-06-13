@@ -162,6 +162,7 @@ export class TranslateRuntime {
       appSettingService: app_setting_service,
       database,
       projectEventBus: project_event_bus,
+      projectTaskStore: project_task_store,
       projectLifecycleService: project_lifecycle_service,
       taskService: task_service,
       taskSnapshotBuilder: task_snapshot_builder,
@@ -193,6 +194,7 @@ export class TranslateRuntimeServices {
   public readonly streams: ApiStreamHub;
   private readonly database: ProjectDatabase;
   private readonly project_event_bus: ProjectEventBus;
+  private readonly project_task_store: ProjectTaskStore;
   private readonly task_snapshot_builder: TaskSnapshotBuilder;
   private readonly work_unit_worker_pool: WorkUnitWorkerPool;
   private readonly planning_worker_pool: PlanningWorkerPool;
@@ -201,6 +203,7 @@ export class TranslateRuntimeServices {
     appSettingService: AppSettingService;
     database: ProjectDatabase;
     projectEventBus: ProjectEventBus;
+    projectTaskStore: ProjectTaskStore;
     projectLifecycleService: ProjectLifecycleService;
     taskService: TaskService;
     taskSnapshotBuilder: TaskSnapshotBuilder;
@@ -212,6 +215,7 @@ export class TranslateRuntimeServices {
     this.appSettingService = options.appSettingService;
     this.database = options.database;
     this.project_event_bus = options.projectEventBus;
+    this.project_task_store = options.projectTaskStore;
     this.projectLifecycleService = options.projectLifecycleService;
     this.taskService = options.taskService;
     this.task_snapshot_builder = options.taskSnapshotBuilder;
@@ -260,6 +264,11 @@ export class TranslateRuntimeServices {
       sectionRevisions: section_revisions,
       scope: "prompts-full",
     });
+  }
+
+  public async restore_failed_translation_items_for_continue(): Promise<number> {
+    const result = await this.project_task_store.restore_failed_translation_items_for_continue();
+    return Number(result["restored_count"] ?? 0);
   }
 
   public async dispose(): Promise<void> {

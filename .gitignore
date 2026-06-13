@@ -1,4 +1,5 @@
 *.log
+!change.log
 refs/
 translate/dist/
 translate/node_modules/
