@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "noUncheckedSideEffectImports": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "types": ["node", "vitest"],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "src/index.ts",
+    "src/cli/cli-entry.ts",
+    "src/cli/cli-output.ts",
+    "src/cli/cli-parser.ts",
+    "src/cli/cli-parser.test.ts",
+    "src/cli/cli-resource-applier.ts",
+    "src/cli/cli-status-reporter.ts",
+    "src/cli/cli-status-reporter.test.ts",
+    "src/cli/analyze-runner.ts",
+    "src/cli/analyze-runtime.ts",
+    "src/cli/analyze-job-runner.ts",
+    "src/backend/engine/work-unit/work-unit-worker-entry.ts",
+    "src/backend/engine/planning/planning-worker-entry.ts"
+  ],
+  "exclude": ["dist", "node_modules"]
+}

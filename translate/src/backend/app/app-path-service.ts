@@ -149,13 +149,13 @@ export class AppPathService {
   }
 
   /**
-   * 将提示词任务类型映射为目录名，避免资源路径出现第二套命名
+   * 将提示词任务类型映射为目录名，CLI 只保留翻译提示词资源。
    */
   public get_prompt_task_dir_name(task_type: string): string {
-    if (task_type !== "translation" && task_type !== "analysis") {
+    if (task_type !== "translation") {
       throw new AppErrors.InternalInvariantError();
     }
-    return `${task_type}_prompt`;
+    return "translation_prompt";
   }
 
   /**

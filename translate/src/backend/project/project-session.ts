@@ -27,7 +27,6 @@ import { NativeFs, default_native_fs } from "../../native/native-fs";
 import * as AppErrors from "../../shared/error";
 import type { SourceFileParseFailureRecord } from "../../shared/source-file-parse-failure";
 import {
-  build_analysis_progress_snapshot,
   compute_project_prefilter_write,
   create_empty_translation_task_snapshot,
   type ProjectPrefilterWriteOutput,
@@ -282,7 +281,6 @@ export class ProjectLifecycleService {
       "items",
       "translation_extras",
       "prefilter_config",
-      "analysis_extras",
       "parsed_items",
       "file_record",
     ]) {
@@ -605,11 +603,6 @@ export class ProjectLifecycleService {
       skip_duplicate_source_text_enable: args.project_settings.skip_duplicate_source_text_enable,
       prefilter_config: args.prefilter_output.prefilter_config as unknown as ApiJsonValue,
       translation_extras: args.prefilter_output.translation_extras as unknown as ApiJsonValue,
-      analysis_extras: build_analysis_progress_snapshot({
-        extras: args.prefilter_output.analysis.extras,
-        status_summary: args.prefilter_output.analysis.status_summary,
-      }) as unknown as ApiJsonValue,
-      analysis_candidate_count: args.prefilter_output.analysis.candidate_count,
     };
   }
 
@@ -620,7 +613,6 @@ export class ProjectLifecycleService {
     return {
       files: get_section_revision(meta, "files"),
       items: get_section_revision(meta, "items"),
-      analysis: get_section_revision(meta, "analysis"),
     };
   }
 

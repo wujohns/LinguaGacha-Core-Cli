@@ -194,19 +194,22 @@ describe("parse_cli_args", () => {
         "ALL",
       ]),
     ).toThrow("Unsupported target language: ALL");
-	    expect(() => parse_cli_args([...base, "--prompt"])).toThrow("Missing value for --prompt");
-	    expect(() => parse_cli_args([...base, "--input", "   "])).not.toThrow();
-	    expect(() => parse_cli_args([...base, "--worker-count", "0"])).toThrow(
-	      "--worker-count must be a positive integer",
-	    );
-	    expect(() => parse_cli_args([...base, "--limiter-url", "ftp://127.0.0.1"])).toThrow(
-	      "--limiter-url must be an http(s) URL",
-	    );
+    expect(() => parse_cli_args([...base, "--prompt"])).toThrow("Missing value for --prompt");
+    expect(() => parse_cli_args([...base, "--input", "   "])).not.toThrow();
+    expect(() => parse_cli_args([...base, "--worker-count", "0"])).toThrow(
+      "--worker-count must be a positive integer",
+    );
+    expect(() => parse_cli_args([...base, "--limiter-url", "ftp://127.0.0.1"])).toThrow(
+      "--limiter-url must be an http(s) URL",
+    );
     expect(() => parse_cli_args([...base, "--limiter-resource", "deepseek"])).toThrow(
       "--limiter-url is required when limiter options are provided",
     );
     expect(() => parse_cli_args([...base, "--limiter-lease-ttl-ms", "300000"])).toThrow(
       "Unknown option: --limiter-lease-ttl-ms",
     );
-	  });
+    expect(() => parse_cli_args([...base, "--limiter-acquire-wait-ms", "15000"])).toThrow(
+      "Unknown option: --limiter-acquire-wait-ms",
+    );
+  });
 });

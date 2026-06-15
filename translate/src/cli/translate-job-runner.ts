@@ -87,7 +87,6 @@ function build_cli_default_preset_overrides(): Record<string, ApiJsonValue> {
     pre_translation_replacement_default_preset: "",
     post_translation_replacement_default_preset: "",
     translation_custom_prompt_default_preset: "",
-    analysis_custom_prompt_default_preset: "",
   };
 }
 

@@ -8,7 +8,7 @@ import {
   normalize_project_item_public_record,
   type ProjectItemPublicRecord,
 } from "../../domain/item";
-import { is_task_skipped_item_status, TASK_PROGRESS_STATUSES } from "../../domain/task";
+import { TASK_PROGRESS_STATUSES } from "../../domain/task";
 import * as AppErrors from "../../shared/error";
 import { should_skip_by_language_prefilter } from "../../shared/prefilter/language-prefilter";
 import { should_skip_by_rule_prefilter } from "../../shared/prefilter/rule-prefilter";
@@ -66,15 +66,8 @@ export type ProjectPrefilterStats = {
   duplicated: number; // 同文件重复原文跳过数量
 };
 
-export type ProjectAnalysisWriteOutput = {
-  extras: Record<string, unknown>; // 当前分析进度保留字段，新建和 reset 默认从空对象开始
-  candidate_count: number; // 当前候选术语数，预过滤不会生成候选
-  status_summary: Record<string, unknown>; // 分析视角的可处理、已处理和失败行数摘要
-};
-
 export type ProjectPrefilterWriteOutput = {
   items: Record<string, ProjectItemPublicRecord>; // 预过滤后的完整公开 item 集合
-  analysis: ProjectAnalysisWriteOutput; // 重置后的分析计算事实
   translation_extras: Record<string, unknown>; // 按最终 item 状态重建的翻译进度 meta
   project_settings: {
     source_language: string; // 写回 settings mirror 的源语言
@@ -158,7 +151,6 @@ function build_translation_extras(task_snapshot: Record<string, unknown>): Recor
       key === "status" ||
       key === "busy" ||
       key === "request_in_flight_count" ||
-      key === "analysis_candidate_count" ||
       key === "extras" ||
       key === "progress"
     ) {
@@ -225,78 +217,6 @@ export function build_translation_extras_from_items(args: {
   translation_extras.line = processed_line + error_line;
 
   return translation_extras;
-}
-
-// 分析 reset 的默认统计只统计仍需分析的非跳过条目。
-/**
- * 构建当前场景的稳定结果。
- */
-export function build_analysis_status_summary(
-  items: Iterable<ProjectItemViewRecord>,
-): Record<string, unknown> {
-  let total_line = 0;
-  for (const item of items) {
-    if (item.src.trim() === "" || is_task_skipped_item_status(item.status)) {
-      continue;
-    }
-    total_line += 1;
-  }
-
-  return {
-    total_line,
-    processed_line: 0,
-    error_line: 0,
-    line: 0,
-  };
-}
-
-// 分析进度快照只保留稳定数字字段，避免坏 meta 扩散到任务运行态。
-/**
- * 归一化输入，保证下游消费稳定形状。
- */
-export function normalize_analysis_progress_snapshot(
-  snapshot: Record<string, unknown>,
-): Record<string, unknown> {
-  return {
-    start_time: Number(snapshot.start_time ?? 0.0),
-    time: Number(snapshot.time ?? 0.0),
-    total_line: Number(snapshot.total_line ?? 0),
-    line: Number(snapshot.line ?? 0),
-    processed_line: Number(snapshot.processed_line ?? 0),
-    error_line: Number(snapshot.error_line ?? 0),
-    total_tokens: Number(snapshot.total_tokens ?? 0),
-    total_input_tokens: Number(snapshot.total_input_tokens ?? 0),
-    total_output_tokens: Number(snapshot.total_output_tokens ?? 0),
-  };
-}
-
-// 把保留统计和当前状态摘要合成为分析进度 meta。
-/**
- * 构建当前场景的稳定结果。
- */
-export function build_analysis_progress_snapshot(args: {
-  extras: Record<string, unknown>;
-  status_summary: Record<string, unknown>;
-}): Record<string, unknown> {
-  const snapshot: Record<string, unknown> = {
-    start_time: 0.0,
-    time: 0.0,
-    total_line: 0,
-    line: 0,
-    processed_line: 0,
-    error_line: 0,
-    total_tokens: 0,
-    total_input_tokens: 0,
-    total_output_tokens: 0,
-  };
-  Object.assign(snapshot, args.extras);
-  return normalize_analysis_progress_snapshot({
-    ...snapshot,
-    total_line: args.status_summary.total_line ?? 0,
-    line: args.status_summary.line ?? 0,
-    processed_line: args.status_summary.processed_line ?? 0,
-    error_line: args.status_summary.error_line ?? 0,
-  });
 }
 
 // 从 files section 镜像收窄预过滤需要的文件字段。
@@ -483,11 +403,6 @@ export function compute_project_prefilter_write(
 
   return {
     items: next_items,
-    analysis: {
-      extras: {},
-      candidate_count: 0,
-      status_summary: build_analysis_status_summary(item_index.values()),
-    },
     translation_extras,
     project_settings: {
       source_language: input.source_language,
@@ -865,7 +780,7 @@ export class ProjectChangePublisher {
 
 type JsonRecord = Record<string, ApiJsonValue>;
 
-type RevisionBackedSection = "files" | "items" | "analysis" | "proofreading";
+type RevisionBackedSection = "files" | "items";
 
 export type ProjectWriteRevisionContext = {
   project_path: string; // revision guard 与 revision writer 必须使用同一个工程身份
@@ -1146,7 +1061,7 @@ export class ProjectWriteCoordinator {
     const events: ProjectEvent[] = [];
     if (
       request.updatedSections.some(
-        (section) => section === "items" || section === "files" || section === "proofreading",
+        (section) => section === "items" || section === "files",
       )
     ) {
       events.push({
@@ -1169,14 +1084,6 @@ export class ProjectWriteCoordinator {
         ...common,
         type: "project.prompts.changed",
         scope: "prompts-full",
-      });
-    }
-    if (request.updatedSections.includes("analysis")) {
-      events.push({
-        ...common,
-        type: "project.analysis.changed",
-        sections: request.sections,
-        scope: "analysis-full",
       });
     }
     if (request.updatedSections.includes("project")) {
@@ -1228,9 +1135,6 @@ export function normalize_project_expected_section_revisions(
  * 运行态 section 到 meta key 的唯一映射，避免各服务各自拼 revision key
  */
 function resolve_revision_meta_key(section: RevisionBackedSection): string {
-  if (section === "proofreading") {
-    return "proofreading_revision.proofreading";
-  }
   return `project_runtime_revision.${section}`;
 }
 
@@ -1241,8 +1145,6 @@ function filter_revision_backed_sections(sections: ProjectDataSection[]): Revisi
   return sections.filter(
     (section): section is RevisionBackedSection =>
       section === "files" ||
-      section === "items" ||
-      section === "analysis" ||
-      section === "proofreading",
+      section === "items",
   );
 }

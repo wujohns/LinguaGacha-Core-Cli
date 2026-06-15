@@ -6,7 +6,6 @@ import { TaskRunPublisher } from "../engine/run/task-run-publisher";
 import { TaskSnapshotBuilder } from "../engine/run/task-snapshot-builder";
 import { type JsonRecord, type MutableJsonRecord } from "../engine/run/task-run-types";
 import type { StartTaskCommand, StopTaskCommand } from "../engine/protocol/task-command";
-import { TaskDefinitionRegistry } from "../engine/definitions/registry";
 import { TranslationTaskDefinition } from "../engine/definitions/translation/translation-task-definition";
 import * as AppErrors from "../../shared/error";
 import {
@@ -28,7 +27,7 @@ export class TaskService {
 
   private readonly project_operation_gate: ProjectOperationGate; // 统一判断任务启动是否会撞上 busy 或结构性写入
 
-  private readonly task_definition_registry = new TaskDefinitionRegistry(); // 任务类型差异和 revision 依赖的唯一注册表
+  private readonly translation_definition = new TranslationTaskDefinition(); // CLI 只保留 translation 任务定义
 
   /**
    * 注入任务命令依赖，保持公开协议、运行态桥和配置读取边界可测试
@@ -44,7 +43,6 @@ export class TaskService {
     this.snapshot_builder = snapshot_builder;
     this.task_run_publisher = task_run_publisher;
     this.project_operation_gate = project_operation_gate;
-    this.task_definition_registry.register(new TranslationTaskDefinition());
   }
 
   /**
@@ -177,12 +175,11 @@ export class TaskService {
       expected_section_revisions: expected_section_revisions ?? {},
       ...(worker_count === undefined ? {} : { worker_count }),
     };
-    const definition = this.task_definition_registry.get(command);
     this.assert_expected_section_revisions(
       expected_section_revisions,
-      definition.revision_dependencies(command),
+      this.translation_definition.revision_dependencies(command),
     );
-    return definition.normalize_command(command);
+    return this.translation_definition.normalize_command(command);
   }
 
   /**

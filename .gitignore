@@ -5,3 +5,9 @@ translate/dist/
 translate/node_modules/
 translate/.linguagacha-translate-runtime/
 translate/.vitest/
+
+analyze/node_modules/
+analyze/dist/
+analyze/.linguagacha-analyze-runtime/
+analyze/.vitest/
+analyze/coverage/

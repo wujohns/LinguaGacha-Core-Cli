@@ -359,9 +359,6 @@ class TranslateCache implements CacheReadPort {
   public readonly prompts = {
     readBlock: (): ProjectDataRecord => ({ ...this.prompt_block }),
   };
-  public readonly analysis = {
-    readBlock: (): ProjectDataRecord => ({}),
-  };
 
   public constructor(database: ProjectDatabase) {
     this.data_reader = new ProjectDataReader(database);

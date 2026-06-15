@@ -1,7 +1,6 @@
 import type {
   ProjectChangeFilesPayload,
   ProjectChangeItemsPayload,
-  ProjectChangeSectionPayload,
   ProjectDataSection,
   ProjectDataSectionRevisions,
 } from "../../shared/project-event";
@@ -13,14 +12,12 @@ export type ProjectEventType =
   | "project.items.changed"
   | "project.quality.changed"
   | "project.prompts.changed"
-  | "project.settings.changed"
-  | "project.analysis.changed";
+  | "project.settings.changed";
 
 // 标识写入来源，用于缓存诊断和 after-commit 事件追踪。
 export type ProjectEventSource =
   | "project_lifecycle"
   | "project_write"
-  | "proofreading"
   | "quality"
   | "task"
   | "cli"
@@ -75,13 +72,6 @@ export type ProjectSettingsChangedEvent = BaseProjectEvent<"project.settings.cha
   changedKeys?: string[];
 };
 
-// 汇总分析候选或分析状态的刷新范围。
-export type ProjectAnalysisChangedEvent = BaseProjectEvent<"project.analysis.changed"> & {
-  affectedSections: ProjectDataSection[];
-  sections?: Partial<Record<ProjectDataSection, ProjectChangeSectionPayload>>;
-  scope?: "analysis-partial" | "analysis-full";
-};
-
 // Backend 内部事件总线唯一事件联合类型。
 export type ProjectEvent =
   | ProjectOpenedForCacheEvent
@@ -89,8 +79,7 @@ export type ProjectEvent =
   | ProjectItemsChangedEvent
   | ProjectQualityChangedEvent
   | ProjectPromptsChangedEvent
-  | ProjectSettingsChangedEvent
-  | ProjectAnalysisChangedEvent;
+  | ProjectSettingsChangedEvent;
 
 // 供订阅者按事件名获得窄化 payload。
 export type ProjectEventOfType<TType extends ProjectEventType> = Extract<
@@ -116,8 +105,6 @@ export function create_project_opened_for_cache_event(args: {
       "items",
       "quality",
       "prompts",
-      "analysis",
-      "proofreading",
     ],
     sectionRevisions: { ...args.sectionRevisions },
   };

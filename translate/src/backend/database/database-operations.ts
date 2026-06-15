@@ -38,10 +38,6 @@ function json_parse(raw_value: unknown): DatabaseJsonValue {
   return JsonTool.parseStrict<DatabaseJsonValue>(raw_value);
 }
 
-function json_stringify(value: DatabaseJsonValue): string {
-  return JsonTool.stringifyStrict(value);
-}
-
 function sqlite_bind_value(value: DatabaseJsonValue): SqliteBindValue {
   if (value === null || typeof value === "number" || typeof value === "string") {
     return value;
@@ -191,41 +187,6 @@ export class ProjectDatabase {
           this.require_string(args, "projectPath"),
           this.require_string_array(args, "sections"),
         );
-      case "getAnalysisItemCheckpoints":
-        return this.get_analysis_item_checkpoints(this.require_string(args, "projectPath"));
-      case "upsertAnalysisItemCheckpoints":
-        this.upsert_analysis_item_checkpoints(
-          this.require_string(args, "projectPath"),
-          this.require_array(args, "checkpoints"),
-        );
-        return null;
-      case "deleteAnalysisItemCheckpoints":
-        return this.delete_analysis_item_checkpoints(
-          this.require_string(args, "projectPath"),
-          this.optional_string(args, "status"),
-        );
-      case "getAnalysisCandidateAggregates":
-        return this.get_analysis_candidate_aggregates(this.require_string(args, "projectPath"));
-      case "getAnalysisCandidateAggregatesBySrcs":
-        return this.get_analysis_candidate_aggregates_by_srcs(
-          this.require_string(args, "projectPath"),
-          this.require_string_array(args, "srcs"),
-        );
-      case "upsertAnalysisCandidateAggregates":
-        this.upsert_analysis_candidate_aggregates(
-          this.require_string(args, "projectPath"),
-          this.require_array(args, "aggregates"),
-        );
-        return null;
-      case "deleteAnalysisCandidateAggregatesBySrcs":
-        this.delete_analysis_candidate_aggregates_by_srcs(
-          this.require_string(args, "projectPath"),
-          this.require_string_array(args, "srcs"),
-        );
-        return null;
-      case "clearAnalysisCandidateAggregates":
-        this.clear_analysis_candidate_aggregates(this.require_string(args, "projectPath"));
-        return null;
       case "addAssetFromSource":
         this.add_asset_from_source(
           this.require_string(args, "projectPath"),
@@ -649,7 +610,7 @@ export class ProjectDatabase {
    */
   private bump_section_revisions(project_path: string, sections: string[]): DatabaseJsonValue {
     const db = this.open_project(project_path);
-    const supported_sections = new Set(["files", "items", "analysis"]);
+    const supported_sections = new Set(["files", "items"]);
     const next_revisions: Record<string, number> = {};
     for (const section of sections) {
       if (!supported_sections.has(section) || section in next_revisions) {
@@ -676,176 +637,6 @@ export class ProjectDatabase {
   private normalize_revision_value(value: DatabaseJsonValue): number {
     const revision = Number(value ?? 0);
     return Number.isFinite(revision) && revision > 0 ? Math.trunc(revision) : 0;
-  }
-
-  /**
-   * 读取分析 checkpoint，保持断点续跑只依赖持久事实
-   */
-  private get_analysis_item_checkpoints(project_path: string): DatabaseJsonValue {
-    const db = this.open_project(project_path);
-    return db
-      .prepare(
-        `SELECT item_id, status, updated_at, error_count
-         FROM analysis_item_checkpoint
-         ORDER BY item_id`,
-      )
-      .all()
-      .map((row) => ({
-        item_id: row_number(row, "item_id"),
-        status: row_text(row, "status"),
-        updated_at: row_text(row, "updated_at"),
-        error_count: row_number(row, "error_count"),
-      }));
-  }
-
-  /**
-   * 批量保存分析 checkpoint，保证任务提交进度可恢复
-   */
-  private upsert_analysis_item_checkpoints(
-    project_path: string,
-    checkpoints: DatabaseJsonValue[],
-  ): void {
-    const db = this.open_project(project_path);
-    const statement = db.prepare(
-      `INSERT INTO analysis_item_checkpoint (item_id, status, updated_at, error_count)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(item_id) DO UPDATE SET
-         status = excluded.status,
-         updated_at = excluded.updated_at,
-         error_count = excluded.error_count`,
-    );
-    for (const checkpoint of checkpoints) {
-      const row = this.value_record(checkpoint);
-      statement.run(
-        Number(row["item_id"] ?? 0),
-        String(row["status"] ?? ""),
-        String(row["updated_at"] ?? ""),
-        Number(row["error_count"] ?? 0),
-      );
-    }
-  }
-
-  /**
-   * 删除指定 checkpoint，避免重置后残留分析状态
-   */
-  private delete_analysis_item_checkpoints(project_path: string, status: string | null): number {
-    const db = this.open_project(project_path);
-    if (status === null) {
-      return Number(db.prepare("DELETE FROM analysis_item_checkpoint").run().changes);
-    }
-    return Number(
-      db.prepare("DELETE FROM analysis_item_checkpoint WHERE status = ?").run(status).changes,
-    );
-  }
-
-  /**
-   * 归一候选聚合行，确保不同写入来源共用同一返回形状
-   */
-  private normalize_candidate_rows(rows: DatabaseRow[]): DatabaseJsonValue {
-    return rows.map((row) => ({
-      src: row_text(row, "src"),
-      dst_votes: json_parse(row["dst_votes"]),
-      info_votes: json_parse(row["info_votes"]),
-      observation_count: row_number(row, "observation_count"),
-      first_seen_at: row_text(row, "first_seen_at"),
-      last_seen_at: row_text(row, "last_seen_at"),
-      case_sensitive: Boolean(row_number(row, "case_sensitive")),
-    }));
-  }
-
-  /**
-   * 读取分析候选聚合，供术语导入预演复用
-   */
-  private get_analysis_candidate_aggregates(project_path: string): DatabaseJsonValue {
-    const db = this.open_project(project_path);
-    return this.normalize_candidate_rows(
-      db
-        .prepare(
-          `SELECT src, dst_votes, info_votes, observation_count, first_seen_at, last_seen_at, case_sensitive
-           FROM analysis_candidate_aggregate
-           ORDER BY src`,
-        )
-        .all(),
-    );
-  }
-
-  /**
-   * 按原文批量读取候选聚合，减少分析辅助查询次数
-   */
-  private get_analysis_candidate_aggregates_by_srcs(
-    project_path: string,
-    srcs: string[],
-  ): DatabaseJsonValue {
-    const normalized_srcs = srcs.map((src) => src.trim()).filter((src) => src !== "");
-    if (normalized_srcs.length === 0) {
-      return [];
-    }
-    const placeholders = normalized_srcs.map(() => "?").join(",");
-    const db = this.open_project(project_path);
-    return this.normalize_candidate_rows(
-      db
-        .prepare(
-          `SELECT src, dst_votes, info_votes, observation_count, first_seen_at, last_seen_at, case_sensitive
-           FROM analysis_candidate_aggregate
-           WHERE src IN (${placeholders})
-           ORDER BY src`,
-        )
-        .all(...normalized_srcs),
-    );
-  }
-
-  /**
-   * 批量写入候选聚合，保持分析结果提交原子化
-   */
-  private upsert_analysis_candidate_aggregates(
-    project_path: string,
-    aggregates: DatabaseJsonValue[],
-  ): void {
-    const db = this.open_project(project_path);
-    const statement = db.prepare(
-      `INSERT INTO analysis_candidate_aggregate (
-         src, dst_votes, info_votes, observation_count, first_seen_at, last_seen_at, case_sensitive
-       ) VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(src) DO UPDATE SET
-         dst_votes = excluded.dst_votes,
-         info_votes = excluded.info_votes,
-         observation_count = excluded.observation_count,
-         last_seen_at = excluded.last_seen_at,
-         case_sensitive = excluded.case_sensitive`,
-    );
-    for (const aggregate of aggregates) {
-      const row = this.value_record(aggregate);
-      statement.run(
-        String(row["src"] ?? ""),
-        json_stringify((row["dst_votes"] ?? {}) as DatabaseJsonValue),
-        json_stringify((row["info_votes"] ?? {}) as DatabaseJsonValue),
-        Number(row["observation_count"] ?? 0),
-        String(row["first_seen_at"] ?? ""),
-        String(row["last_seen_at"] ?? ""),
-        row["case_sensitive"] === true ? 1 : 0,
-      );
-    }
-  }
-
-  /**
-   * 清空候选聚合，确保分析重置不混入残留候选
-   */
-  private clear_analysis_candidate_aggregates(project_path: string): void {
-    this.open_project(project_path).prepare("DELETE FROM analysis_candidate_aggregate").run();
-  }
-
-  /**
-   * 候选导入确认后按 src 消费候选池，避免已处理候选在下一次导入继续弹出
-   */
-  private delete_analysis_candidate_aggregates_by_srcs(project_path: string, srcs: string[]): void {
-    const normalized_srcs = [...new Set(srcs.map((src) => src.trim()).filter((src) => src !== ""))];
-    if (normalized_srcs.length === 0) {
-      return;
-    }
-    const placeholders = normalized_srcs.map(() => "?").join(",");
-    this.open_project(project_path)
-      .prepare(`DELETE FROM analysis_candidate_aggregate WHERE src IN (${placeholders})`)
-      .run(...normalized_srcs);
   }
 
   /**
@@ -1533,14 +1324,6 @@ export class ProjectDatabase {
       throw new AppErrors.RequestValidationError();
     }
     return value;
-  }
-
-  /**
-   * 校验可选字符串，统一空值和类型错误语义
-   */
-  private optional_string(args: Record<string, DatabaseJsonValue>, key: string): string | null {
-    const value = args[key];
-    return typeof value === "string" && value !== "" ? value : null;
   }
 
   /**

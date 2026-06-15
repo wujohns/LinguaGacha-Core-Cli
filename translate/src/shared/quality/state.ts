@@ -66,9 +66,8 @@ export function getPromptSlice(
   prompts: PromptsSnapshot,
   task_type: QualityStateTaskKind,
 ): PromptSlice {
-  return task_type === "translation"
-    ? clonePromptSlice(prompts.translation)
-    : clonePromptSlice(prompts.analysis);
+  void task_type;
+  return clonePromptSlice(prompts.translation);
 }
 
 /**
@@ -111,13 +110,9 @@ export function replacePromptSlice(
   task_type: QualityStateTaskKind,
   next_slice: PromptSlice,
 ): PromptsSnapshot {
+  void task_type;
   return {
-    translation:
-      task_type === "translation"
-        ? clonePromptSlice(next_slice)
-        : clonePromptSlice(prompts.translation),
-    analysis:
-      task_type === "analysis" ? clonePromptSlice(next_slice) : clonePromptSlice(prompts.analysis),
+    translation: clonePromptSlice(next_slice),
   };
 }
 

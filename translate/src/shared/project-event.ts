@@ -19,9 +19,7 @@ export type ProjectDataSection =
   | "files"
   | "items"
   | "quality"
-  | "prompts"
-  | "analysis"
-  | "proofreading";
+  | "prompts";
 
 // 变更事件的 payload mode 决定订阅方是直接合并、字段 patch 还是整段补读。
 export type ProjectChangePayloadMode = "canonical-delta" | "field-patch" | "section-invalidated";
@@ -54,7 +52,7 @@ export type ProjectChangeFilesPayload = {
   deletePaths?: string[];
 };
 
-// section canonical-delta 携带后端规范 data；analysis 高频事件可只携带轻量进度块
+// section canonical-delta 携带后端规范 data。
 export type ProjectChangeSectionPayload = {
   payloadMode: ProjectChangePayloadMode;
   data?: ProjectChangeJsonValue;
@@ -91,8 +89,6 @@ export const PROJECT_DATA_SECTIONS: readonly ProjectDataSection[] = [
   "items",
   "quality",
   "prompts",
-  "analysis",
-  "proofreading",
 ] as const;
 
 // 公开 stream topic；所有项目数据变更必须从这个 topic 进入订阅方。
