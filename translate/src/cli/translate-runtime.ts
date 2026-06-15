@@ -35,17 +35,22 @@ import type { ProjectDataRecord } from "../backend/project/project-data";
 import type { ProjectEvent, ProjectEventType } from "../backend/project/project-events";
 import type { ProjectDataSectionRevisions } from "../shared/project-event";
 import { JsonTool } from "../shared/utils/json-tool";
+import type { TranslateCliLimiterOptions } from "./cli-parser";
 
 export interface TranslateRuntimeStartOptions {
   appRoot: string;
   configPath: string;
   workerExecution?: BackendWorkerExecution;
+  workerCount?: number;
+  limiter?: TranslateCliLimiterOptions | null;
 }
 
 export class TranslateRuntime {
   private readonly app_root: string;
   private readonly config_path: string;
   private readonly worker_execution: BackendWorkerExecution;
+  private readonly worker_count: number | undefined;
+  private readonly limiter: TranslateCliLimiterOptions | null;
   private readonly data_root: string;
   private database: ProjectDatabase | null = null;
   private readonly stream_hub = new ApiStreamHub();
@@ -56,6 +61,9 @@ export class TranslateRuntime {
     this.app_root = path.resolve(options.appRoot);
     this.config_path = path.resolve(options.configPath);
     this.worker_execution = options.workerExecution ?? build_default_worker_execution(this.app_root);
+    this.worker_count =
+      options.workerCount === undefined ? undefined : Math.max(1, Math.trunc(options.workerCount));
+    this.limiter = options.limiter ?? null;
     this.data_root = path.join(path.dirname(this.config_path), ".linguagacha-translate-runtime");
   }
 
@@ -130,6 +138,9 @@ export class TranslateRuntime {
       appRoot: this.app_root,
       execution: this.worker_execution,
       systemProxySnapshot: null,
+      workerCount: this.worker_count,
+      maxInFlight: this.worker_count,
+      limiter: this.limiter,
     });
     const planning_worker_pool = new PlanningWorkerPool({ execution: this.worker_execution });
     const task_engine = new TaskEngine({

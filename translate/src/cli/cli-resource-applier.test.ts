@@ -85,6 +85,8 @@ describe("apply_cli_resources", () => {
       outputDir: "/work/out",
       sourceLanguage: "JA",
       targetLanguage: "ZH",
+      workerCount: null,
+      limiter: null,
       resources: {
         promptPath: null,
         glossaryPath: null,

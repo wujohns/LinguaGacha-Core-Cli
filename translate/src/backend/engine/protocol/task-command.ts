@@ -6,6 +6,7 @@ export type StartTaskCommand = {
   mode: TaskStartMode; // 只描述本轮启动语义，不参与状态机
   scope: TranslationScope; // CLI 当前固定为全量翻译
   expected_section_revisions: Record<string, number>; // revision 锁保护后台任务输入不基于旧快照运行
+  worker_count?: number; // CLI 本地 work-unit worker 上限，不等同于远端 LLM 并发额度
 };
 
 /** StopTaskCommand 只按 translation 停止。 */

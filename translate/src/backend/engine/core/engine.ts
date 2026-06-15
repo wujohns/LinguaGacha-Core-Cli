@@ -21,7 +21,6 @@ import type {
   TranslationCommitEntry,
   TranslationContext,
 } from "../planning/task-plan-types";
-import { LimiterPool, TaskLimiter } from "./limiter-pool";
 import { ModelKeyLeasePool } from "./model-key-lease-pool";
 import { TaskPipeline } from "./pipeline-runner";
 import { TaskProgressSnapshotTool } from "./progress-accumulator";
@@ -36,6 +35,7 @@ const TRANSLATION_TERMINAL_STATUSES = new Set(["PROCESSED", "ERROR"]); // 翻译
 const TRANSLATION_RETRY_LIMIT = 3; // 翻译支持拆分重试，超限条目进入 ERROR。
 
 const DEFAULT_INPUT_TOKEN_LIMIT = 512; // 模型未配置 token 限制时使用保守默认值，避免一次塞入过长 prompt
+const DEFAULT_TRANSLATION_WORKER_COUNT = 1; // CLI 未传 --worker-count 时保持保守串行执行。
 // 一次任务启动时冻结配置和模型，运行中不跟随设置页热变更
 interface TaskRunContext {
   config_snapshot: MutableJsonRecord;
@@ -43,7 +43,7 @@ interface TaskRunContext {
 }
 
 /**
- * Node 运行时的后台翻译任务执行权威，持有生命周期、调度、限流、停止、重试和提交循环
+ * Node 运行时的后台翻译任务执行权威，持有生命周期、调度、停止、重试和提交循环
  */
 export class TaskEngine {
   private readonly app_root: string; // 让 Backend 启动日志和 worker 使用同一套提示词资源
@@ -55,9 +55,8 @@ export class TaskEngine {
   private readonly app_setting_service: TaskEngineOptions["AppSettingService"];
   private readonly run_coordinator: RunCoordinator; // 整场任务互斥、停止和终态发布的唯一权威
   private readonly log_replay: TaskLogReplay; // 统一处理任务生命周期日志和 worker 日志回放
-  private readonly limiter_pool = new LimiterPool(); // 后台任务按模型资源键复用请求节奏入口
   private readonly model_key_lease_pool = new ModelKeyLeasePool(); // 在主线程维护任务级全局 Key 轮换
-  private request_in_flight_count = 0; // 只表达实时网络压力，不落库也不参与恢复
+  private request_in_flight_count = 0; // 兼容既有 snapshot 字段；当前表达已派发 work-unit 压力
 
   /**
    * 注入任务执行依赖，保证任务数据写入口和 work-unit executor 边界可测试
@@ -128,9 +127,8 @@ export class TaskEngine {
       let progress = this.build_translation_progress(legacy_mode, all_items, meta);
       await this.update_translation_progress_if_current(handle, progress);
       await this.emit_progress(handle.task_type);
-      const limiter = this.resolve_task_limiter(run_context.model);
       const pipeline = new TaskPipeline<TranslationContext, TranslationCommitEntry>({
-        worker_count: limiter.max_concurrency,
+        worker_count: this.resolve_worker_count(command.worker_count),
         signal: handle.signal,
         execute: (context, signal) =>
           this.execute_translation_context(
@@ -138,7 +136,6 @@ export class TaskEngine {
             context,
             run_context,
             quality_snapshot,
-            limiter,
             signal,
         ),
         commit: async (entries) => {
@@ -171,14 +168,12 @@ export class TaskEngine {
     context: TranslationContext,
     run_context: TaskRunContext,
     quality_snapshot: ApiJsonValue,
-    limiter: TaskLimiter,
     signal: AbortSignal,
   ) {
     const result = await this.call_translation_executor_with_retryable_transport(
       context,
       handle,
       signal,
-      limiter,
       () =>
         this.executor_client
           .execute_unit(
@@ -217,11 +212,15 @@ export class TaskEngine {
     context: TranslationContext,
     handle: TaskRunHandle,
     signal: AbortSignal,
-    limiter: TaskLimiter,
     callback: () => Promise<TranslationWorkUnitResult>,
   ): Promise<TranslationWorkUnitResult> {
     try {
-      return await this.call_with_limiter(handle, limiter, signal, callback);
+      await this.change_request_in_flight_count(handle.task_type, 1);
+      try {
+        return await callback();
+      } finally {
+        await this.change_request_in_flight_count(handle.task_type, -1);
+      }
     } catch (error) {
       if (signal.aborted || !(error instanceof WorkUnitExecutorTransportError)) {
         throw error;
@@ -233,25 +232,6 @@ export class TaskEngine {
         output_tokens: 0,
         stopped: false,
       };
-    }
-  }
-
-  /**
-   * 带限流执行 work unit 请求，同时维护 服务端真实 request_in_flight_count
-   */
-  private async call_with_limiter<T>(
-    handle: TaskRunHandle,
-    limiter: TaskLimiter,
-    signal: AbortSignal,
-    callback: () => Promise<T>,
-  ): Promise<T> {
-    const lease = await limiter.acquire(signal);
-    await this.change_request_in_flight_count(handle.task_type, 1);
-    try {
-      return await callback();
-    } finally {
-      await this.change_request_in_flight_count(handle.task_type, -1);
-      lease.release();
     }
   }
 
@@ -433,7 +413,7 @@ export class TaskEngine {
   }
 
   /**
-   * 请求数变化只更新运行态，公开 snapshot 由后端 500ms 窗口合并发布
+   * work-unit 压力变化只更新运行态，公开 snapshot 由后端 500ms 窗口合并发布
    */
   private async change_request_in_flight_count(task_type: TaskType, delta: number): Promise<void> {
     this.request_in_flight_count = Math.max(0, this.request_in_flight_count + delta);
@@ -506,11 +486,11 @@ export class TaskEngine {
     }
   }
 
-  /**
-   * 解析任务限流器；同一模型配置下后台任务共享并发和 RPM 节奏
-   */
-  private resolve_task_limiter(model: MutableJsonRecord): TaskLimiter {
-    return this.limiter_pool.resolve(model);
+  private resolve_worker_count(value: unknown): number {
+    const worker_count = Number(value ?? DEFAULT_TRANSLATION_WORKER_COUNT);
+    return Number.isFinite(worker_count)
+      ? Math.max(1, Math.trunc(worker_count))
+      : DEFAULT_TRANSLATION_WORKER_COUNT;
   }
 
   /**

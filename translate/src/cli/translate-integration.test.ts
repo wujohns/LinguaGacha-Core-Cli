@@ -112,10 +112,12 @@ describe("translate CLI integration", () => {
         projectPath: project_path,
         configPath: config_path,
         inputPaths: mode === "new" ? [input_path] : [],
-        outputDir: output_dir,
-        sourceLanguage: "EN",
-        targetLanguage: "ZH",
-        resources: {
+	        outputDir: output_dir,
+	        sourceLanguage: "EN",
+	        targetLanguage: "ZH",
+	        workerCount: null,
+	        limiter: null,
+	        resources: {
           promptPath: null,
           glossaryPath: null,
           preReplacementPath: null,
@@ -206,10 +208,12 @@ describe("translate CLI integration", () => {
         projectPath: project_path,
         configPath: config_path,
         inputPaths: mode === "new" ? [input_path] : [],
-        outputDir: output_dir,
-        sourceLanguage: "EN",
-        targetLanguage: "ZH",
-        resources: {
+	        outputDir: output_dir,
+	        sourceLanguage: "EN",
+	        targetLanguage: "ZH",
+	        workerCount: null,
+	        limiter: null,
+	        resources: {
           promptPath: null,
           glossaryPath: null,
           preReplacementPath: null,

@@ -19,8 +19,14 @@ describe("parse_cli_args", () => {
       "./out",
       "--source-language",
       "JA",
-      "--target-language",
-      "ZH",
+	      "--target-language",
+	      "ZH",
+	      "--worker-count",
+	      "6",
+      "--limiter-url",
+      "http://127.0.0.1:8787/",
+      "--limiter-resource",
+      "deepseek",
       "--prompt",
       "./prompt.txt",
       "--glossary",
@@ -40,10 +46,15 @@ describe("parse_cli_args", () => {
         projectPath: "./work/game.lg",
         configPath: "./config.json",
         inputPaths: ["./src-a", "./src-b"],
-        outputDir: "./out",
-        sourceLanguage: "JA",
-        targetLanguage: "ZH",
-        resources: {
+	        outputDir: "./out",
+	        sourceLanguage: "JA",
+	        targetLanguage: "ZH",
+	        workerCount: 6,
+        limiter: {
+          url: "http://127.0.0.1:8787",
+          resource: "deepseek",
+        },
+	        resources: {
           promptPath: "./prompt.txt",
           glossaryPath: "./glossary.json",
           preReplacementPath: "./pre.xlsx",
@@ -72,11 +83,13 @@ describe("parse_cli_args", () => {
 
     expect(result.kind).toBe("command");
     if (result.kind === "command") {
-      expect(result.command.inputPaths).toEqual([]);
-      expect(result.command.sourceLanguage).toBe("ALL");
-      expect(result.command.targetLanguage).toBe("ZH-HANT");
-    }
-  });
+	      expect(result.command.inputPaths).toEqual([]);
+	      expect(result.command.sourceLanguage).toBe("ALL");
+	      expect(result.command.targetLanguage).toBe("ZH-HANT");
+	      expect(result.command.workerCount).toBeNull();
+	      expect(result.command.limiter).toBeNull();
+	    }
+	  });
 
   it("accepts reset without input paths", () => {
     const result = parse_cli_args([
@@ -181,7 +194,19 @@ describe("parse_cli_args", () => {
         "ALL",
       ]),
     ).toThrow("Unsupported target language: ALL");
-    expect(() => parse_cli_args([...base, "--prompt"])).toThrow("Missing value for --prompt");
-    expect(() => parse_cli_args([...base, "--input", "   "])).not.toThrow();
-  });
+	    expect(() => parse_cli_args([...base, "--prompt"])).toThrow("Missing value for --prompt");
+	    expect(() => parse_cli_args([...base, "--input", "   "])).not.toThrow();
+	    expect(() => parse_cli_args([...base, "--worker-count", "0"])).toThrow(
+	      "--worker-count must be a positive integer",
+	    );
+	    expect(() => parse_cli_args([...base, "--limiter-url", "ftp://127.0.0.1"])).toThrow(
+	      "--limiter-url must be an http(s) URL",
+	    );
+    expect(() => parse_cli_args([...base, "--limiter-resource", "deepseek"])).toThrow(
+      "--limiter-url is required when limiter options are provided",
+    );
+    expect(() => parse_cli_args([...base, "--limiter-lease-ttl-ms", "300000"])).toThrow(
+      "Unknown option: --limiter-lease-ttl-ms",
+    );
+	  });
 });

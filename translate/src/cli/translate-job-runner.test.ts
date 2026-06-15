@@ -13,6 +13,7 @@ import type { TranslateRuntimeServices } from "./translate-runtime";
 type TaskStartRecord = {
   task_type: string;
   mode: string;
+  worker_count?: number;
 };
 
 class FakeStreamHub {
@@ -154,11 +155,12 @@ describe("run_translate_job", () => {
     expect(services.created_projects).toHaveLength(1);
     expect(services.loaded_projects).toEqual([]);
     expect(services.start_records).toHaveLength(1);
-    expect(services.start_records[0]).toMatchObject({
-      task_type: "translation",
-      mode: "new",
-      scope: { kind: "all" },
-    });
+	    expect(services.start_records[0]).toMatchObject({
+	      task_type: "translation",
+	      mode: "new",
+	      scope: { kind: "all" },
+	      worker_count: 3,
+	    });
     expect(services.exported_dirs).toEqual([command.outputDir]);
     expect(services.unloaded).toBe(true);
     expect(services.transient_overrides.at(-1)).toBeNull();
@@ -205,10 +207,12 @@ describe("run_translate_job", () => {
         projectPath: path.join(root, "project.lg"),
         configPath: config_path,
         inputPaths: mode === "new" ? [input_path] : [],
-        outputDir: path.join(root, "out"),
-        sourceLanguage: "JA",
-        targetLanguage: "ZH",
-        resources: {
+	        outputDir: path.join(root, "out"),
+	        sourceLanguage: "JA",
+	        targetLanguage: "ZH",
+	        workerCount: mode === "new" ? 3 : null,
+	        limiter: null,
+	        resources: {
           promptPath: null,
           glossaryPath: null,
           preReplacementPath: null,

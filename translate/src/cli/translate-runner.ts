@@ -11,6 +11,8 @@ export async function run_translate_cli_command(
   const runtime = new TranslateRuntime({
     appRoot: app_root,
     configPath: command.configPath,
+    workerCount: command.workerCount ?? undefined,
+    limiter: command.limiter,
   });
   try {
     const services = await runtime.start();

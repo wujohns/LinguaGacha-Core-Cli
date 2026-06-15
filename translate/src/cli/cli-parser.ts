@@ -24,7 +24,14 @@ export interface TranslateCliOptions {
   outputDir: string;
   sourceLanguage: SourceLanguageCode | typeof ALL_LANGUAGE_CODE;
   targetLanguage: TargetLanguageCode;
+  workerCount: number | null;
+  limiter: TranslateCliLimiterOptions | null;
   resources: TranslateCliResources;
+}
+
+export interface TranslateCliLimiterOptions {
+  url: string;
+  resource: string;
 }
 
 export interface TranslateCliResources {
@@ -68,6 +75,9 @@ function parse_command_options(tokens: string[]): TranslateCliOptions {
   let output_dir = "";
   let source_language = "";
   let target_language = "";
+  let worker_count: number | null = null;
+  let limiter_url = "";
+  let limiter_resource = "";
   const input_paths: string[] = [];
   const resources = create_empty_resources();
 
@@ -94,6 +104,15 @@ function parse_command_options(tokens: string[]): TranslateCliOptions {
       index += 1;
     } else if (token === "--target-language") {
       target_language = read_option_value(token, value);
+      index += 1;
+    } else if (token === "--worker-count") {
+      worker_count = read_positive_integer_option(token, value);
+      index += 1;
+    } else if (token === "--limiter-url") {
+      limiter_url = normalize_limiter_url(read_option_value(token, value));
+      index += 1;
+    } else if (token === "--limiter-resource") {
+      limiter_resource = require_non_empty_text(read_option_value(token, value), token);
       index += 1;
     } else if (token === "--prompt") {
       resources.promptPath = normalize_resource_path(read_option_value(token, value), token, [
@@ -145,6 +164,11 @@ function parse_command_options(tokens: string[]): TranslateCliOptions {
     outputDir: require_non_empty_text(output_dir, "--output-dir"),
     sourceLanguage: normalize_source_language(source_language),
     targetLanguage: normalize_target_language(target_language),
+    workerCount: worker_count,
+    limiter: build_limiter_options({
+      url: limiter_url,
+      resource: limiter_resource,
+    }),
     resources,
   };
 }
@@ -187,6 +211,15 @@ function read_option_value(option_name: string, value: string | undefined): stri
   return value.trim();
 }
 
+function read_positive_integer_option(option_name: string, value: string | undefined): number {
+  const normalized_value = require_non_empty_text(read_option_value(option_name, value), option_name);
+  const number_value = Number(normalized_value);
+  if (!Number.isInteger(number_value) || number_value <= 0) {
+    throw new CLIUsageError(`${option_name} must be a positive integer`);
+  }
+  return number_value;
+}
+
 function normalize_input_paths(values: string[]): string[] {
   return values.map((value) => value.trim()).filter((value) => value !== "");
 }
@@ -205,6 +238,38 @@ function require_lg_path(value: string): string {
     throw new CLIUsageError("--project must point to a .lg file");
   }
   return project_path;
+}
+
+function normalize_limiter_url(value: string): string {
+  const normalized_value = require_non_empty_text(value, "--limiter-url").replace(/\/+$/u, "");
+  try {
+    const url = new URL(normalized_value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new CLIUsageError("--limiter-url must be an http(s) URL");
+    }
+  } catch (error) {
+    if (error instanceof CLIUsageError) {
+      throw error;
+    }
+    throw new CLIUsageError("--limiter-url must be an http(s) URL");
+  }
+  return normalized_value;
+}
+
+function build_limiter_options(options: {
+  url: string;
+  resource: string;
+}): TranslateCliLimiterOptions | null {
+  if (options.url === "") {
+    if (options.resource !== "") {
+      throw new CLIUsageError("--limiter-url is required when limiter options are provided");
+    }
+    return null;
+  }
+  return {
+    url: options.url,
+    resource: options.resource === "" ? "default" : options.resource,
+  };
 }
 
 function normalize_source_language(value: string): SourceLanguageCode | typeof ALL_LANGUAGE_CODE {

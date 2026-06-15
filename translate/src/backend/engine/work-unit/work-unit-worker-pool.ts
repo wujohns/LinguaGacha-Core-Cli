@@ -17,6 +17,7 @@ import {
   type LogError,
 } from "../../../shared/error";
 import type { SystemProxySnapshot } from "../../network/system-proxy-dispatcher";
+import type { LLMRequestLimiterOptions } from "../../llm/llm-request-limiter-client";
 
 interface WorkUnitWorkerPoolOptions {
   appRoot: string;
@@ -24,6 +25,7 @@ interface WorkUnitWorkerPoolOptions {
   systemProxySnapshot?: SystemProxySnapshot | null;
   workerCount?: number;
   maxInFlight?: number;
+  limiter?: LLMRequestLimiterOptions | null;
 }
 
 interface PendingTask {
@@ -47,6 +49,7 @@ export class WorkUnitWorkerPool implements WorkUnitExecutor {
   private readonly app_root: string; // 提供 worker_threads 和同进程 runner 读取资源模板的根目录
   private readonly execution: BackendWorkerExecution; // 由入口层显式决定，池内不做入口探测或模式回退
   private readonly system_proxy_snapshot: SystemProxySnapshot | null; // 让 worker 线程复用主线程启动期代理快照
+  private readonly limiter: LLMRequestLimiterOptions | null; // 可选外部 LLM 请求额度服务配置
   private readonly worker_count: number; // worker_threads 模式下的固定线程数
   private readonly max_in_flight: number; // 全池并发上限，不等同于线程数
   private readonly queue: PendingTask[] = [];
@@ -63,13 +66,17 @@ export class WorkUnitWorkerPool implements WorkUnitExecutor {
     this.app_root = options.appRoot;
     this.execution = options.execution;
     this.system_proxy_snapshot = options.systemProxySnapshot ?? null;
+    this.limiter = options.limiter ?? null;
     this.worker_count = resolve_default_worker_count({
       workerCount: options.workerCount,
       availableParallelism: os.availableParallelism?.() ?? os.cpus().length,
     });
     this.max_in_flight = Math.max(1, Math.trunc(options.maxInFlight ?? Number.MAX_SAFE_INTEGER));
     if (this.execution.kind === "in_process") {
-      this.in_process_runner = new WorkUnitRunner({ appRoot: this.app_root });
+      this.in_process_runner = new WorkUnitRunner({
+        appRoot: this.app_root,
+        limiter: this.limiter,
+      });
       return;
     }
     for (let index = 0; index < this.worker_count; index += 1) {
@@ -220,6 +227,7 @@ export class WorkUnitWorkerPool implements WorkUnitExecutor {
         workerData: {
           appRoot: this.app_root,
           systemProxySnapshot: this.system_proxy_snapshot,
+          limiter: this.limiter,
         },
       }),
       in_flight: new Map(),

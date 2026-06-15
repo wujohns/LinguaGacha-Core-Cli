@@ -1,6 +1,10 @@
 import type { WorkUnit } from "../protocol/work-unit";
 import type { WorkUnitExecutionResult } from "../protocol/work-unit-result";
 import { LLMClient } from "../../llm/llm-client";
+import {
+  LLMRequestLimiterClient,
+  type LLMRequestLimiterOptions,
+} from "../../llm/llm-request-limiter-client";
 import { AppMetadataService } from "../../app/app-metadata-service";
 import { AppPathService } from "../../app/app-path-service";
 import { TranslationWorkUnitRunner } from "./runners/translation-runner";
@@ -11,6 +15,7 @@ import * as AppErrors from "../../../shared/error";
  */
 export interface WorkUnitRunnerOptions {
   appRoot: string; // 用于读取资源模板和预设，不能从 worker 当前目录反推
+  limiter?: LLMRequestLimiterOptions | null; // 可选外部请求额度服务；缺省时直接请求 LLM
 }
 
 /**
@@ -26,7 +31,11 @@ export class WorkUnitRunner {
     const paths = new AppPathService({ appRoot: options.appRoot }); // 让 worker 内 User-Agent 读取同一个应用根
     const metadata = new AppMetadataService(paths); // 在 worker 内只读取只读版本元信息
     const llm_client = new LLMClient({ userAgent: metadata.build_linguagacha_user_agent() });
-    this.translation_runner = new TranslationWorkUnitRunner(options.appRoot, llm_client);
+    const request_client =
+      options.limiter === null || options.limiter === undefined
+        ? llm_client
+        : new LLMRequestLimiterClient(llm_client, options.limiter);
+    this.translation_runner = new TranslationWorkUnitRunner(options.appRoot, request_client);
   }
 
   /**

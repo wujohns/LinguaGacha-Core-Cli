@@ -145,6 +145,7 @@ async function start_and_wait_for_translation(
       task_type: "translation",
       mode: command.mode,
       scope: { kind: "all" } as unknown as ApiJsonValue,
+      ...(command.workerCount === null ? {} : { worker_count: command.workerCount }),
       expected_section_revisions: services.build_expected_section_revisions([
         "quality",
         "prompts",

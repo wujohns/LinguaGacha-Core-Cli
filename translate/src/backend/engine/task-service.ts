@@ -165,6 +165,7 @@ export class TaskService {
   private normalize_start_command(request: JsonRecord): StartTaskCommand {
     const task_type = this.require_task_type(request["task_type"]);
     const mode = this.normalize_mode(request["mode"]);
+    const worker_count = this.normalize_optional_positive_integer(request["worker_count"]);
     const expected_section_revisions = this.normalize_expected_section_revisions(
       request["expected_section_revisions"],
     );
@@ -174,6 +175,7 @@ export class TaskService {
       mode,
       scope,
       expected_section_revisions: expected_section_revisions ?? {},
+      ...(worker_count === undefined ? {} : { worker_count }),
     };
     const definition = this.task_definition_registry.get(command);
     this.assert_expected_section_revisions(
@@ -209,6 +211,17 @@ export class TaskService {
       throw new AppErrors.RequestValidationError();
     }
     return mode;
+  }
+
+  private normalize_optional_positive_integer(value: ApiJsonValue | undefined): number | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    const number_value = Number(value);
+    if (!Number.isInteger(number_value) || number_value <= 0) {
+      throw new AppErrors.RequestValidationError();
+    }
+    return number_value;
   }
 
   /**

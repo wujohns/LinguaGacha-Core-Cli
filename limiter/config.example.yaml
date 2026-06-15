@@ -1,0 +1,16 @@
+host: 127.0.0.1
+port: 8787
+
+default_concurrency: 1
+default_lease_ttl_ms: 300000
+default_retry_after_ms: 1000
+
+resources:
+  default:
+    concurrency: 1
+    lease_ttl_ms: 300000
+    retry_after_ms: 1000
+  deepseek:
+    concurrency: 8
+    lease_ttl_ms: 300000
+    retry_after_ms: 1000
