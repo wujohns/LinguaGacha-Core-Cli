@@ -23,6 +23,8 @@
     "src/cli/analyze-runner.ts",
     "src/cli/analyze-runtime.ts",
     "src/cli/analyze-job-runner.ts",
+    "src/cli/analyze-job-runner.test.ts",
+    "src/backend/engine/store/project-task-store.test.ts",
     "src/backend/engine/work-unit/work-unit-worker-entry.ts",
     "src/backend/engine/planning/planning-worker-entry.ts"
   ],

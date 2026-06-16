@@ -274,6 +274,11 @@ export class AnalyzeRuntimeServices {
     });
   }
 
+  public async restore_failed_analysis_items_for_continue(): Promise<number> {
+    const result = await this.project_task_store.restore_failed_analysis_items_for_continue();
+    return Number(result["restored_count"] ?? 0);
+  }
+
   public async dispose(): Promise<void> {
     this.appSettingService.set_stream_publisher(null);
     this.streams.stop();

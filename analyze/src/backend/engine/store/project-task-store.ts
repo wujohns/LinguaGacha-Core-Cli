@@ -68,6 +68,33 @@ export class ProjectTaskStore {
     return { accepted: true };
   }
 
+  public async restore_failed_analysis_items_for_continue(): Promise<MutableJsonRecord> {
+    const project_path = this.require_loaded_project_path();
+    const failed_checkpoints = this.get_analysis_checkpoints(project_path).filter(
+      (checkpoint) => String(checkpoint["status"] ?? "") === "ERROR",
+    );
+    if (failed_checkpoints.length === 0) {
+      return { restored_count: 0 };
+    }
+    const now = new Date().toISOString();
+    const restored_checkpoints = failed_checkpoints
+      .map((checkpoint) => this.read_number(checkpoint["item_id"], 0))
+      .filter((item_id) => item_id > 0)
+      .map((item_id) => ({
+        item_id,
+        status: "NONE",
+        updated_at: now,
+        error_count: 0,
+      }));
+    if (restored_checkpoints.length === 0) {
+      return { restored_count: 0 };
+    }
+    return await this.write_store.restore_failed_analysis_checkpoints_for_continue({
+      projectPath: project_path,
+      checkpoints: restored_checkpoints as unknown as ApiJsonValue,
+    });
+  }
+
   public update_analysis_progress(request: JsonRecord): MutableJsonRecord {
     const project_path = this.require_loaded_project_path();
     const snapshot = this.normalize_progress_snapshot(

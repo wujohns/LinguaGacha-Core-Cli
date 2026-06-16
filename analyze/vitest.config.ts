@@ -5,7 +5,9 @@ export default defineConfig({
     include: [
       "src/cli/cli-parser.test.ts",
       "src/cli/cli-resource-applier.test.ts",
+      "src/cli/analyze-job-runner.test.ts",
       "src/cli/cli-status-reporter.test.ts",
+      "src/backend/engine/store/project-task-store.test.ts",
     ],
   },
 });

@@ -187,6 +187,48 @@ export class ProjectWriteStore {
     });
   }
 
+  public async restore_failed_analysis_checkpoints_for_continue(request: {
+    projectPath: string;
+    checkpoints: ApiJsonValue | undefined;
+  }): Promise<MutableJsonRecord> {
+    const checkpoints = this.normalize_checkpoint_rows(request.checkpoints).map((checkpoint) => ({
+      ...checkpoint,
+      status: "NONE",
+      error_count: 0,
+    }));
+    if (checkpoints.length === 0) {
+      return { restored_count: 0 };
+    }
+    const meta = this.read_project_meta(request.projectPath);
+    await this.commit_runtime_change({
+      projectPath: request.projectPath,
+      requireExpectedSectionRevisions: false,
+      revisionSections: ["analysis"],
+      source: "analysis_continue_restore",
+      updatedSections: ["analysis"],
+      sections: {
+        analysis: {
+          payloadMode: "canonical-delta",
+          data: this.build_analysis_section_delta(
+            this.normalize_object(meta["analysis_extras"]),
+            this.read_number(meta["analysis_candidate_count"], 0),
+          ) as unknown as ApiJsonValue,
+        },
+      },
+      buildOperations: (revision_context) => [
+        this.op("upsertAnalysisItemCheckpoints", {
+          projectPath: request.projectPath,
+          checkpoints: checkpoints as unknown as DatabaseJsonValue,
+        }),
+        ...this.write_coordinator.build_section_revision_operations(revision_context),
+      ],
+    });
+    return {
+      restored_count: checkpoints.length,
+      section_revisions: this.build_section_revisions(request.projectPath, ["analysis"]),
+    };
+  }
+
   private async commit_runtime_change(request: RuntimeCommitRequest): Promise<ProjectWriteResult> {
     const revision_context = request.requireExpectedSectionRevisions
       ? this.write_coordinator.assert_expected_section_revisions(

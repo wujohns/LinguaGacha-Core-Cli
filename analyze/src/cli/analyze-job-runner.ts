@@ -26,6 +26,9 @@ export async function run_analyze_job(
     assert_existing_paths(command);
     fs.mkdirSync(command.outputDir, { recursive: true });
     await prepare_project(services, command);
+    if (command.mode === "continue") {
+      await services.restore_failed_analysis_items_for_continue();
+    }
     services.appSettingService.set_transient_overrides({
       ...build_cli_default_preset_overrides(),
       output_folder_open_on_finish: false,

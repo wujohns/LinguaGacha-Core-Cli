@@ -11,3 +11,5 @@ analyze/dist/
 analyze/.linguagacha-analyze-runtime/
 analyze/.vitest/
 analyze/coverage/
+
+ppocrv6/model/

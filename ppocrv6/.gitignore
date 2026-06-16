@@ -1,0 +1,10 @@
+node_modules/
+.model-cache/
+*.tmp
+
+# Local detection artifacts
+boxes*.json
+debug*.png
+final-*.json
+final-*.png
+sample.png
