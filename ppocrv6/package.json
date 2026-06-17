@@ -2,11 +2,13 @@
   "name": "ppocrv6-transformers-eval",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "detect": "node test-ppocrv6-det.mjs"
+    "detect": "node test-ppocrv6-det.cjs"
   },
   "dependencies": {
+    "@techstark/opencv-js": "^4.12.0-release.1",
+    "clipper-lib": "^6.4.2",
+    "js-yaml": "^4.2.0",
     "onnxruntime-web": "^1.26.0",
     "sharp": "^0.34.5"
   }

@@ -4,7 +4,7 @@ This directory contains a minimal Node.js test script for running the local
 `PaddlePaddle/PP-OCRv6_medium_det_onnx` text detection model.
 
 The script is intentionally not a CLI. Edit the paths at the top of
-`test-ppocrv6-det.mjs`, then run it.
+`test-ppocrv6-det.cjs`, then run it.
 
 ## Install
 
@@ -15,7 +15,7 @@ npm install
 
 ## Configure
 
-Open `test-ppocrv6-det.mjs` and fill:
+Open `test-ppocrv6-det.cjs` and fill:
 
 ```js
 const INPUT_IMAGE_PATH = "";
@@ -36,7 +36,7 @@ const DEBUG_IMAGE_PATH = "./debug.png";
 ## Run
 
 ```bash
-node test-ppocrv6-det.mjs
+node test-ppocrv6-det.cjs
 ```
 
 ## Local Model
@@ -66,5 +66,7 @@ with detected boxes drawn on top.
 
 - This is text detection only, not text recognition.
 - Runtime is `onnxruntime-web` with the WASM backend.
-- Postprocess is a pure JS connected-components AABB approximation, not full
-  PaddleOCR DBPostProcess.
+- The script uses CommonJS because `@techstark/opencv-js` is more stable through
+  `require()` in this Node.js backend spike.
+- Postprocess uses OpenCV.js contour/min-area-rect scoring plus `clipper-lib`
+  polygon unclip to closely follow PaddleOCR DBPostProcess.
