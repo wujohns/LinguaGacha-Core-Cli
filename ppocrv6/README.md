@@ -26,9 +26,9 @@ const DEBUG_IMAGE_PATH = "";
 Example:
 
 ```js
-const INPUT_IMAGE_PATH = "/tmp/ppocrv6-transformers-eval/sample.png";
-const OUTPUT_JSON_PATH = "./boxes.json";
-const DEBUG_IMAGE_PATH = "./debug.png";
+const INPUT_IMAGE_PATH = path.join(ASSETS_DIR, "sample.png");
+const OUTPUT_JSON_PATH = path.join(ASSETS_DIR, "boxes.json");
+const DEBUG_IMAGE_PATH = path.join(ASSETS_DIR, "debug.png");
 ```
 
 `DEBUG_IMAGE_PATH` can stay empty if you only want JSON.
@@ -41,12 +41,33 @@ node test-ppocrv6-det.cjs
 
 ## Local Model
 
-The script uses the checked-in local model files:
+The script uses the local detection model files:
 
-- `model/inference.onnx`
-- `model/inference.yml`
+- `model/medium-det/inference.onnx`
+- `model/medium-det/inference.yml`
 
-It does not download models and does not call transformers.js pipeline APIs.
+Download model files with Make:
+
+```bash
+make medium-det
+make medium-rec
+make tiny-det
+make tiny-rec
+```
+
+Or download all configured models:
+
+```bash
+make models
+```
+
+If direct Hugging Face access is unstable, pass a per-command proxy:
+
+```bash
+make models CURL_PROXY="-x http://127.0.0.1:7990"
+```
+
+The script does not call transformers.js pipeline APIs.
 
 ## Output
 
@@ -70,3 +91,6 @@ with detected boxes drawn on top.
   `require()` in this Node.js backend spike.
 - Postprocess uses OpenCV.js contour/min-area-rect scoring plus `clipper-lib`
   polygon unclip to closely follow PaddleOCR DBPostProcess.
+- The one-off PaddleOCR/Python golden comparison has already confirmed matching
+  box counts and near-matching locations; the remaining differences are only
+  pixel-level coordinate/score drift and occasional contour order changes.

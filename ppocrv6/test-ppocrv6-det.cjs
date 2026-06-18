@@ -10,16 +10,18 @@ const yaml = require("js-yaml");
 
 // Fill these paths before running.
 // Example:
-//   const INPUT_IMAGE_PATH = "/tmp/ppocrv6-transformers-eval/sample.png";
-//   const OUTPUT_JSON_PATH = "./boxes.json";
-//   const DEBUG_IMAGE_PATH = "./debug.png";
-const INPUT_IMAGE_PATH = "./test.png";
-const OUTPUT_JSON_PATH = "./boxes.json";
-const DEBUG_IMAGE_PATH = "./debug.png";
+//   const INPUT_IMAGE_PATH = path.join(ASSETS_DIR, "sample.png");
+//   const OUTPUT_JSON_PATH = path.join(ASSETS_DIR, "boxes.json");
+//   const DEBUG_IMAGE_PATH = path.join(ASSETS_DIR, "debug.png");
+const SCRIPT_DIR = __dirname;
+const ASSETS_DIR = path.join(SCRIPT_DIR, "assets");
+const INPUT_IMAGE_PATH = path.join(ASSETS_DIR, "test.png");
+const OUTPUT_JSON_PATH = path.join(ASSETS_DIR, "boxes.json");
+const DEBUG_IMAGE_PATH = path.join(ASSETS_DIR, "debug.png");
 
 // Local PP-OCRv6 detection model files.
-const SCRIPT_DIR = __dirname;
-const MODEL_DIR = path.join(SCRIPT_DIR, "model");
+// const MODEL_DIR = path.join(SCRIPT_DIR, "model", "medium-det");
+const MODEL_DIR = path.join(SCRIPT_DIR, "model", "tiny-det");
 const MODEL_ONNX_PATH = path.join(MODEL_DIR, "inference.onnx");
 const MODEL_YML_PATH = path.join(MODEL_DIR, "inference.yml");
 
@@ -377,11 +379,6 @@ function detectBoxes(outputTensor, originalWidth, originalHeight, postprocess) {
     hierarchy.delete();
   }
 
-  boxes.sort((a, b) => {
-    const ay = (a.points[0][1] + a.points[2][1]) / 2;
-    const by = (b.points[0][1] + b.points[2][1]) / 2;
-    return Math.abs(ay - by) > 10 ? ay - by : a.points[0][0] - b.points[0][0];
-  });
   return boxes;
 }
 

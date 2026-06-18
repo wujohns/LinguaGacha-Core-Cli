@@ -12,4 +12,6 @@ analyze/.linguagacha-analyze-runtime/
 analyze/.vitest/
 analyze/coverage/
 
-ppocrv6/model/
+ppocrv6/model/**/*.onnx
+ppocrv6/model/**/*.yml
+ppocrv6/model/**/*.tmp

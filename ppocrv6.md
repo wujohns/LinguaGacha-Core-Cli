@@ -8,7 +8,7 @@
 - 不下载模型。
 - 不检查 transformers.js pipeline。
 - 不做文本识别，只做 text detection。
-- 使用本工程内的 `ppocrv6/model/inference.onnx` 和 `ppocrv6/model/inference.yml`。
+- 默认使用本工程内的 `ppocrv6/model/medium-det/inference.onnx` 和 `ppocrv6/model/medium-det/inference.yml`。
 
 脚本使用 CommonJS，是因为 `@techstark/opencv-js` 在当前 Node.js 后端脚本中通过 `require()` 加载更稳定。
 
@@ -17,9 +17,9 @@
 编辑脚本顶部三个常量：
 
 ```js
-const INPUT_IMAGE_PATH = "./test.png";
-const OUTPUT_JSON_PATH = "./boxes.json";
-const DEBUG_IMAGE_PATH = "./debug.png";
+const INPUT_IMAGE_PATH = path.join(ASSETS_DIR, "test.png");
+const OUTPUT_JSON_PATH = path.join(ASSETS_DIR, "boxes.json");
+const DEBUG_IMAGE_PATH = path.join(ASSETS_DIR, "debug.png");
 ```
 
 然后运行：
@@ -45,11 +45,36 @@ node test-ppocrv6-det.cjs
 - `@techstark/opencv-js`：执行 DBPostProcess 中的 contour、minAreaRect、fillPoly、mean 等 OpenCV 操作。
 - `clipper-lib`：执行 polygon unclip / offset。
 
+## 目录
+
+- `ppocrv6/assets/`：样例图片和本地运行产物。
+- `ppocrv6/model/medium-det/`：当前默认 PP-OCRv6 medium detection 模型。
+- `ppocrv6/model/medium-rec/`：预留 PP-OCRv6 medium recognition 模型。
+- `ppocrv6/model/tiny-det/`：预留 PP-OCRv6 tiny detection 模型。
+- `ppocrv6/model/tiny-rec/`：预留 PP-OCRv6 tiny recognition 模型。
+- `ppocrv6/Makefile`：模型下载入口。
+
+模型下载：
+
+```bash
+cd ppocrv6
+make medium-det
+make medium-rec
+make tiny-det
+make tiny-rec
+```
+
+如果 Hugging Face 直连不稳定，可以单次命令使用代理：
+
+```bash
+make models CURL_PROXY="-x http://127.0.0.1:7990"
+```
+
 ## 总体流程
 
 1. 等待 OpenCV.js runtime 可用。
-2. 读取并解析 `ppocrv6/model/inference.yml`。
-3. 读取 `ppocrv6/model/inference.onnx` 并创建 ONNX session。
+2. 读取并解析 `ppocrv6/model/medium-det/inference.yml`。
+3. 读取 `ppocrv6/model/medium-det/inference.onnx` 并创建 ONNX session。
 4. 按 `DetResizeForTest` 计算 resize 尺寸。
 5. 用 `sharp` resize 图片并读取 raw RGB 数据。
 6. 按 `DecodeImage.img_mode` 写入 RGB 或 BGR 通道顺序。
@@ -97,7 +122,7 @@ node test-ppocrv6-det.cjs
 6. 使用 `clipper-lib` 按 `area * unclip_ratio / perimeter` 做 polygon offset。
 7. 对 unclip 后 polygon 再次取 `minAreaRect`。
 8. 映射回原图坐标。
-9. 按从上到下、从左到右排序输出。
+9. 保留 OpenCV contour 遍历顺序输出。
 
 输出 JSON 中 `postprocess.mode` 为：
 
@@ -118,13 +143,14 @@ JSON 输出包含：
 
 如果 `DEBUG_IMAGE_PATH` 非空，脚本会用 `sharp().composite()` 把检测框画到原图上。
 
-## 剩余验证
+## 验证结论
 
-当前脚本已经使用 Node.js 依赖尽量贴近 PaddleOCR 检测流程，但还没有和 PaddleOCR/Python 官方输出做 golden 对照。
+已用 PaddleOCR/Python golden 做过一次性对照，当前 Node.js 实现与 PaddleOCR/Python golden 在检测框数量和位置上已基本一致。
 
-严格一致性仍需要检查：
+剩余差异属于可接受范围：
 
-- OpenCV.js 和 Python OpenCV 的 contour 顺序差异。
-- `RotatedRect.points()` 和 `cv2.boxPoints()` 的点序差异。
-- `clipper-lib` 和 Python `pyclipper` 的像素级 offset 差异。
-- `sharp` resize 和 OpenCV resize 的插值差异。
+- 像素级坐标误差。
+- score 轻微误差。
+- 少量 OpenCV contour 顺序差异。
+
+这些差异不再作为 TODO 记录，PaddleOCR/Python golden 对比脚本也不再保留在工程中。
