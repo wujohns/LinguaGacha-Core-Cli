@@ -7,4 +7,6 @@ boxes*.json
 debug*.png
 final-*.json
 final-*.png
+*.comic-bubble.json
+*.comic-bubble.png
 sample.png
