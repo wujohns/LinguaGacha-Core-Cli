@@ -9,4 +9,7 @@ final-*.json
 final-*.png
 *.comic-bubble.json
 *.comic-bubble.png
+*.comic-bubble-medium-rec.json
+*.comic-bubble-medium-rec.png
+*.comic-bubble-medium-rec-crops/
 sample.png

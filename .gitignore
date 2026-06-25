@@ -13,6 +13,9 @@ analyze/.vitest/
 analyze/coverage/
 
 ppocrv6/model/**/*.onnx
+ppocrv6/model/**/*.gguf
 ppocrv6/model/**/*.yml
 ppocrv6/model/**/*.json
 ppocrv6/model/**/*.tmp
+
+ppocrv6/assets/

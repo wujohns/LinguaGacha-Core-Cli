@@ -15,13 +15,13 @@ const yaml = require("js-yaml");
 //   const DEBUG_IMAGE_PATH = path.join(ASSETS_DIR, "debug.png");
 const SCRIPT_DIR = __dirname;
 const ASSETS_DIR = path.join(SCRIPT_DIR, "assets");
-const INPUT_IMAGE_PATH = path.join(ASSETS_DIR, "test.png");
+const INPUT_IMAGE_PATH = path.join(ASSETS_DIR, "comic_jp.png");
 const OUTPUT_JSON_PATH = path.join(ASSETS_DIR, "boxes.json");
-const DEBUG_IMAGE_PATH = path.join(ASSETS_DIR, "debug.png");
+const DEBUG_IMAGE_PATH = path.join(ASSETS_DIR, "det_comic_jp.png");
 
 // Local PP-OCRv6 detection model files.
-// const MODEL_DIR = path.join(SCRIPT_DIR, "model", "medium-det");
-const MODEL_DIR = path.join(SCRIPT_DIR, "model", "tiny-det");
+const MODEL_DIR = path.join(SCRIPT_DIR, "model", "medium-det");
+// const MODEL_DIR = path.join(SCRIPT_DIR, "model", "tiny-det");
 const MODEL_ONNX_PATH = path.join(MODEL_DIR, "inference.onnx");
 const MODEL_YML_PATH = path.join(MODEL_DIR, "inference.yml");
 

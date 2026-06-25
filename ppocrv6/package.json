@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "detect": "node test-ppocrv6-det.cjs",
-    "detect:comic": "node test-comic-bubble-det.cjs"
+    "detect:comic": "node test-comic-bubble-det.cjs",
+    "detect:comic:rec": "node test-comic-bubble-medium-rec.cjs",
+    "detect:comic:det-rec": "node test-comic-bubble-medium-det-rec.cjs",
+    "detect:comic:tiny-det-rec": "node test-comic-bubble-tiny-det-rec.cjs"
   },
   "dependencies": {
     "@techstark/opencv-js": "^4.12.0-release.1",
