@@ -21,3 +21,5 @@ Removed for now:
 - runnable Node translation script
 
 Revisit when official `llama.cpp` and `node-llama-cpp` releases support STQ/type 42.
+
+需要等待这个特性就绪: https://github.com/ggml-org/llama.cpp/pull/22836

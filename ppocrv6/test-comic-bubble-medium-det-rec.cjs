@@ -25,8 +25,10 @@ const REC_MODEL_ONNX_PATH = path.join(REC_MODEL_DIR, "inference.onnx");
 const REC_MODEL_YML_PATH = path.join(REC_MODEL_DIR, "inference.yml");
 
 const DEFAULT_INPUT_IMAGE_PATHS = [
-  path.join(ASSETS_DIR, "comic_en.png"),
-  path.join(ASSETS_DIR, "comic_jp.png"),
+  // path.join(ASSETS_DIR, "comic_en.png"),
+  // path.join(ASSETS_DIR, "comic_jp.png"),
+  path.join(ASSETS_DIR, "cct.png"),
+  path.join(ASSETS_DIR, "cctt.png"),
 ];
 
 const INPUT_IMAGE_PATHS = (process.env.INPUT_IMAGES ?? "")
@@ -189,7 +191,43 @@ async function runImage({
 
   await fs.mkdir(cropDir, { recursive: true });
 
-  console.time(`${imageBaseName}:det-rec`);
+  console.time(`${imageBaseName}:medium-det-preprocess`);
+  const detImage = await preprocessDetectionImage(imagePath, detConfig.preprocessing);
+  console.timeEnd(`${imageBaseName}:medium-det-preprocess`);
+
+  const detInputTensor = new ort.Tensor("float32", detImage.tensorData, [
+    1,
+    3,
+    detImage.height,
+    detImage.width,
+  ]);
+
+  console.time(`${imageBaseName}:medium-det-inference`);
+  const detOutputs = await detSession.run({ [detInputName]: detInputTensor });
+  console.timeEnd(`${imageBaseName}:medium-det-inference`);
+
+  const detOutputTensor = detOutputs[detOutputName] ?? detOutputs[detSession.outputNames[0]];
+  if (!detOutputTensor) {
+    throw new Error(`Detection model output not found. Available outputs: ${Object.keys(detOutputs).join(", ")}`);
+  }
+
+  console.time(`${imageBaseName}:medium-det-postprocess`);
+  const mediumDetBoxes = detectBoxes(
+    detOutputTensor,
+    detImage.originalWidth,
+    detImage.originalHeight,
+    detConfig.postprocess,
+  )
+    .map((box, index) => normalizeImageDetectedBox(box, index, detImage.originalWidth, detImage.originalHeight))
+    .filter((box) => isUsableDetectedBox(box.bboxInImage))
+    .sort(compareImageDetectedBoxReadingOrder)
+    .map((box, index) => ({
+      ...box,
+      index,
+    }));
+  console.timeEnd(`${imageBaseName}:medium-det-postprocess`);
+
+  console.time(`${imageBaseName}:rec`);
   const textAreas = [];
   for (let index = 0; index < textDetections.length; index += 1) {
     const detection = textDetections[index];
@@ -199,10 +237,7 @@ async function runImage({
       cropDir,
       textAreaIndex: index,
       detection,
-      detSession,
-      detInputName,
-      detOutputName,
-      detConfig,
+      mediumDetBoxes,
       recSession,
       recInputName,
       recOutputName,
@@ -210,7 +245,7 @@ async function runImage({
     });
     textAreas.push(textArea);
   }
-  console.timeEnd(`${imageBaseName}:det-rec`);
+  console.timeEnd(`${imageBaseName}:rec`);
 
   const result = {
     image: path.resolve(imagePath),
@@ -244,6 +279,8 @@ async function runImage({
       textDetection: {
         inputNames: detSession.inputNames,
         outputNames: detSession.outputNames,
+        inputShape: [1, 3, detImage.height, detImage.width],
+        outputShape: detOutputTensor.dims,
       },
       recognition: {
         inputNames: recSession.inputNames,
@@ -262,6 +299,12 @@ async function runImage({
         doNormalize: Boolean(comicPreprocessorConfig.do_normalize),
       },
       textDetection: {
+        originalWidth: detImage.originalWidth,
+        originalHeight: detImage.originalHeight,
+        resizedWidth: detImage.width,
+        resizedHeight: detImage.height,
+        ratioH: detImage.ratioH,
+        ratioW: detImage.ratioW,
         imgMode: detConfig.preprocessing.imgMode,
         scale: detConfig.preprocessing.scale,
         mean: detConfig.preprocessing.mean,
@@ -286,6 +329,8 @@ async function runImage({
       textDetection: {
         ...detConfig.postprocess,
         mode: "opencv-dbpostprocess-quad",
+        detectionScope: "whole-image-once",
+        assignmentMode: "center-in-text-area-crop",
         bubbleCropPadding: BUBBLE_CROP_PADDING,
         recognitionBoxPadding: OCR_BOX_PADDING,
         verticalAspectRatio: VERTICAL_ASPECT_RATIO,
@@ -295,15 +340,29 @@ async function runImage({
         decoder: "ctc-greedy",
       },
     },
-    counts: countByLabel(allDetections),
+    counts: {
+      comicDetections: countByLabel(allDetections),
+      textAreas: textAreas.length,
+      mediumDetBoxes: mediumDetBoxes.length,
+      assignedMediumDetBoxes: countUniqueAssignedBoxes(textAreas),
+      recognizedSegments: textAreas.reduce(
+        (sum, textArea) => sum + textArea.recognition.selected.segmentCount,
+        0,
+      ),
+    },
     detections: allDetections,
+    textDetection: {
+      boxCount: mediumDetBoxes.length,
+      boxes: mediumDetBoxes.map(serializeImageDetectedBox),
+    },
     textAreas,
   };
 
   await fs.writeFile(outputJsonPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
   await drawDebugImage(imagePath, debugImagePath, textAreas);
 
-  console.log(`comic detections: ${allDetections.length}`, result.counts);
+  console.log(`comic detections: ${allDetections.length}`, result.counts.comicDetections);
+  console.log(`medium-det boxes: ${mediumDetBoxes.length}`);
   console.log(`text areas: ${textAreas.length}`);
   for (const textArea of textAreas) {
     const selected = textArea.recognition.selected;
@@ -323,10 +382,7 @@ async function recognizeTextArea({
   cropDir,
   textAreaIndex,
   detection,
-  detSession,
-  detInputName,
-  detOutputName,
-  detConfig,
+  mediumDetBoxes,
   recSession,
   recInputName,
   recOutputName,
@@ -336,12 +392,9 @@ async function recognizeTextArea({
   const areaCropPath = path.join(cropDir, `${imageBaseName}.text-${textAreaIndex + 1}.bubble.png`);
   await fs.writeFile(areaCropPath, crop.buffer);
 
-  const detectedBoxes = await detectTextBoxesInCrop({
+  const detectedBoxes = findTextBoxesInCrop({
     crop,
-    detSession,
-    detInputName,
-    detOutputName,
-    detConfig,
+    mediumDetBoxes,
   });
   const segments = buildRecognitionSegments(detectedBoxes, crop);
   const segmentsForRecognition = segments.length > 0
@@ -406,38 +459,28 @@ async function recognizeTextArea({
   };
 }
 
-async function detectTextBoxesInCrop({ crop, detSession, detInputName, detOutputName, detConfig }) {
-  const preprocessed = await preprocessDetectionImage(crop.buffer, detConfig.preprocessing);
-  const inputTensor = new ort.Tensor("float32", preprocessed.tensorData, [
-    1,
-    3,
-    preprocessed.height,
-    preprocessed.width,
-  ]);
-  const outputs = await detSession.run({ [detInputName]: inputTensor });
-  const outputTensor = outputs[detOutputName] ?? outputs[detSession.outputNames[0]];
-  if (!outputTensor) {
-    throw new Error(`Detection model output not found. Available outputs: ${Object.keys(outputs).join(", ")}`);
-  }
-
-  return detectBoxes(
-    outputTensor,
-    preprocessed.originalWidth,
-    preprocessed.originalHeight,
-    detConfig.postprocess,
-  )
-    .map((box, index) => {
-      const bbox = pointsToBbox(box.points, crop.width, crop.height, OCR_BOX_PADDING);
+function findTextBoxesInCrop({ crop, mediumDetBoxes }) {
+  const [cropX1, cropY1, cropX2, cropY2] = crop.bboxInImage;
+  return mediumDetBoxes
+    .filter((box) => pointInBox(box.center, crop.bboxInImage))
+    .map((box) => {
+      const pointsInCrop = box.pointsInImage.map(([x, y]) => [
+        round(x - cropX1, 3),
+        round(y - cropY1, 3),
+      ]);
+      const bboxInCrop = pointsToBbox(pointsInCrop, crop.width, crop.height, OCR_BOX_PADDING);
       return {
-        index,
+        index: box.index,
         score: box.score,
-        pointsInCrop: box.points.map((point) => point.map((value) => round(value, 3))),
-        pointsInImage: box.points.map(([x, y]) => [
-          round(x + crop.bboxInImage[0], 3),
-          round(y + crop.bboxInImage[1], 3),
-        ]),
-        bboxInCrop: bbox,
-        bboxInImage: offsetBox(bbox, crop.bboxInImage[0], crop.bboxInImage[1]),
+        pointsInCrop,
+        pointsInImage: box.pointsInImage,
+        bboxInCrop,
+        bboxInImage: [
+          clamp(bboxInCrop[0] + cropX1, cropX1, cropX2),
+          clamp(bboxInCrop[1] + cropY1, cropY1, cropY2),
+          clamp(bboxInCrop[2] + cropX1, cropX1, cropX2),
+          clamp(bboxInCrop[3] + cropY1, cropY1, cropY2),
+        ],
       };
     })
     .filter((box) => isUsableDetectedBox(box.bboxInCrop))
@@ -1257,6 +1300,17 @@ function serializeDetectedBox(box) {
   };
 }
 
+function serializeImageDetectedBox(box) {
+  return {
+    index: box.index,
+    score: round(box.score, 6),
+    pointsInImage: box.pointsInImage,
+    bboxInImage: box.bboxInImage.map((value) => round(value, 3)),
+    center: box.center.map((value) => round(value, 3)),
+    orientation: isVerticalBbox(box.bboxInImage) ? "vertical" : "horizontal",
+  };
+}
+
 function serializeCandidate(candidate) {
   return {
     name: candidate.name,
@@ -1288,6 +1342,21 @@ function serializeCandidate(candidate) {
       input: segment.input,
       outputShape: segment.outputShape,
     })),
+  };
+}
+
+function normalizeImageDetectedBox(box, index, imageWidth, imageHeight) {
+  const points = box.points.map(([x, y]) => [
+    clamp(Number(x), 0, imageWidth),
+    clamp(Number(y), 0, imageHeight),
+  ]);
+  const bbox = pointsToBbox(points, imageWidth, imageHeight, OCR_BOX_PADDING);
+  return {
+    index,
+    score: box.score,
+    pointsInImage: points.map((point) => point.map((value) => round(value, 3))),
+    bboxInImage: bbox,
+    center: boxCenter(bbox),
   };
 }
 
@@ -1471,6 +1540,19 @@ function compareDetectionReadingOrder(a, b) {
   return a.bbox[0] - b.bbox[0];
 }
 
+function compareImageDetectedBoxReadingOrder(a, b) {
+  const aY = a.bboxInImage[1];
+  const bY = b.bboxInImage[1];
+  if (Math.abs(aY - bY) > 20) {
+    return aY - bY;
+  }
+  return a.bboxInImage[0] - b.bboxInImage[0];
+}
+
+function pointInBox(point, box) {
+  return point[0] >= box[0] && point[0] <= box[2] && point[1] >= box[1] && point[1] <= box[3];
+}
+
 function offsetBox(box, offsetX, offsetY) {
   return [
     box[0] + offsetX,
@@ -1495,6 +1577,10 @@ function boxWidth(box) {
 
 function boxCenterX(box) {
   return (box[0] + box[2]) / 2;
+}
+
+function boxCenter(box) {
+  return [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2];
 }
 
 function overlapRatio(a, b) {
@@ -1554,6 +1640,16 @@ function countByLabel(detections) {
     counts[detection.label] = (counts[detection.label] ?? 0) + 1;
     return counts;
   }, {});
+}
+
+function countUniqueAssignedBoxes(textAreas) {
+  const indexes = new Set();
+  for (const textArea of textAreas) {
+    for (const box of textArea.textDetection.boxes) {
+      indexes.add(box.index);
+    }
+  }
+  return indexes.size;
 }
 
 function weightedAverage(entries) {

@@ -7,7 +7,11 @@
     "detect:comic": "node test-comic-bubble-det.cjs",
     "detect:comic:rec": "node test-comic-bubble-medium-rec.cjs",
     "detect:comic:det-rec": "node test-comic-bubble-medium-det-rec.cjs",
-    "detect:comic:tiny-det-rec": "node test-comic-bubble-tiny-det-rec.cjs"
+    "detect:comic:tiny-text-det": "node test-comic-bubble-tiny-text-det.cjs",
+    "detect:comic:tiny-det-rec": "node test-comic-bubble-tiny-det-rec.cjs",
+    "inpaint:comic:lama": "node test-comic-bubble-lama-inpaint.cjs",
+    "inpaint:comic:lama:onepass": "node test-comic-bubble-lama-onepass-inpaint.cjs",
+    "inpaint:comic:fill": "node test-comic-bubble-medium-fill-inpaint.cjs"
   },
   "dependencies": {
     "@techstark/opencv-js": "^4.12.0-release.1",
