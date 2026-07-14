@@ -33,7 +33,7 @@ const INPUT_IMAGE_PATHS = (process.env.INPUT_IMAGES ?? "")
 
 const COMIC_SCORE_THRESHOLD = readNumberEnv("COMIC_BUBBLE_THRESHOLD", 0.35);
 const CONTEXT_LABELS = readStringListEnv("COMIC_FILL_CONTEXT_LABELS", ["bubble"]);
-const TEXT_LABELS = readStringListEnv("COMIC_FILL_TEXT_LABELS", ["text_bubble", "text_free"]);
+const TEXT_LABELS = readStringListEnv("COMIC_FILL_TEXT_LABELS", ["text_bubble"]);
 const MASK_PADDING = readNumberEnv("COMIC_FILL_MASK_PADDING", 2);
 const RING_PADDING = readNumberEnv("COMIC_FILL_RING_PADDING", 8);
 const MERGE_GAP = readNumberEnv("COMIC_FILL_MERGE_GAP", 6);

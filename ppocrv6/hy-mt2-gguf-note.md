@@ -23,3 +23,8 @@ Removed for now:
 Revisit when official `llama.cpp` and `node-llama-cpp` releases support STQ/type 42.
 
 需要等待这个特性就绪: https://github.com/ggml-org/llama.cpp/pull/22836
+
+可以考虑不使用 llama，而是使用如下的更适合的格式:
+https://huggingface.co/onnx-community/HY-MT1.5-1.8B-ONNX
+
+onnx 的 1.25bit 特性可以考虑关注 https://github.com/microsoft/onnxruntime/issues/28549
